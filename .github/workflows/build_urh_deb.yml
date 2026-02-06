@@ -1,0 +1,482 @@
+name: Build URH Multi-Arch Packages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+          - amd64
+          - arm64
+          - riscv64
+      fail-fast: false
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Set platform
+        id: platform
+        run: |
+          case "${{ matrix.arch }}" in
+            amd64) echo "platform=linux/amd64" >> $GITHUB_OUTPUT ;;
+            arm64) echo "platform=linux/arm64" >> $GITHUB_OUTPUT ;;
+            riscv64) echo "platform=linux/riscv64" >> $GITHUB_OUTPUT ;;
+          esac
+      
+      - name: Get version
+        id: version
+        run: |
+          cat > get_version.py << 'EOF'
+          import re
+          with open('setup.py') as f:
+              content = f.read()
+          match = re.search(r'version\s*=\s*["\x27]([^"\x27]+)["\x27]', content)
+          print(match.group(1) if match else '2.10.0')
+          EOF
+          VERSION=$(python3 get_version.py)
+          DATE=$(date +%Y%m%d)
+          COMMIT=$(git rev-parse --short HEAD)
+          DEB_VERSION="${VERSION}+git${DATE}.${COMMIT}"
+          echo "deb_version=${DEB_VERSION}" >> $GITHUB_OUTPUT
+      
+      - name: Build for ${{ matrix.arch }}
+        run: |
+          cat > build.sh << 'BUILDSCRIPT'
+          #!/bin/bash
+          set -e
+          
+          # Set library paths for all SDR libraries
+          export LD_LIBRARY_PATH="/usr/lib:/usr/local/lib:/opt/htraapi/lib/x86_64:/opt/htraapi/lib/aarch64:${LD_LIBRARY_PATH}"
+          
+          echo "=== Building URH for $(uname -m) ==="
+          
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+              python3-venv python3-dev python3-pip \
+              qt6-base-dev libgl1-mesa-dev libxkbcommon-x11-0 libegl1 libxcb-cursor0
+              build-essential cython3 git cmake wget unzip \
+              libxml2-dev libxslt1-dev zlib1g-dev \
+              dpkg-dev fakeroot python3-pyqt5 python3-pyqt5.qtopengl python3-pyqt5.qtsvg
+          
+          echo "[+] Installing SDR libraries for native support"
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+              librtlsdr-dev rtl-sdr \
+              libhackrf-dev hackrf \
+              libairspy-dev \
+              libairspyhf-dev \
+              libiio-dev \
+              liblimesuite-dev limesuite \
+              libbladerf-dev libbladerf2 \
+              libuhd-dev uhd-host \
+              soapysdr-tools libsoapysdr-dev
+          
+          echo "[+] Installing HydraSDR"
+          cd /tmp
+          git clone https://github.com/hydrasdr/rfone_host.git hydrasdr
+          cd hydrasdr
+          mkdir -p build && cd build
+          cmake .. -DCMAKE_INSTALL_PREFIX=/usr
+          make -j$(nproc)
+          make install
+          ldconfig
+          ln -sf /usr/include/libhydrasdr/hydrasdr.h /usr/include/hydrasdr.h
+          ln -sf /usr/include/libhydrasdr/hydrasdr_commands.h /usr/include/hydrasdr_commands.h
+          
+          echo "[+] Installing FUNcube Dongle support"
+          DEBIAN_FRONTEND=noninteractive apt-get install -y libgnuradio-funcube3.10.0 qthid-fcd-controller || {
+              echo "[!] FUNcube packages not available in repos, skipping"
+          }
+          
+          echo "[+] Installing Harogic HTRA API"
+          cd /tmp
+          ARCH=$(uname -m)
+          case "$ARCH" in
+              x86_64|amd64)
+                  SDK_ARCH="x86_64"
+                  wget -q https://github.com/PentHertz/rfswift_harogic_install/releases/download/v0.55.63/Install_HTRA_SDK.zip
+                  ;;
+              aarch64|arm64)
+                  SDK_ARCH="aarch64"
+                  wget -q https://github.com/PentHertz/rfswift_harogic_install/releases/download/v0.55.63/Install_HTRA_SDK.zip
+                  ;;
+              *)
+                  echo "[!] Harogic SDK not available for $ARCH, skipping"
+                  SDK_ARCH=""
+                  ;;
+          esac
+          
+          if [ -n "$SDK_ARCH" ]; then
+              unzip -q Install_HTRA_SDK.zip
+              cd Install_HTRA_SDK/
+              mkdir -p /opt/htraapi
+              cp -r htraapi/* /opt/htraapi/
+              
+              # Setup symlinks for the SDK
+              cd /opt/htraapi/lib/${SDK_ARCH}
+              LIB_FILE=$(ls libhtraapi.so.* | head -1)
+              if [ -n "$LIB_FILE" ]; then
+                  VERSION=${LIB_FILE#*so.}
+                  MAJOR=${VERSION%%.*}
+                  ln -sf libhtraapi.so.${VERSION} libhtraapi.so.${MAJOR}
+                  ln -sf libhtraapi.so.${MAJOR} libhtraapi.so
+                  
+                  # Copy to system paths with explicit names
+                  cp -v libhtraapi.so.${VERSION} /usr/lib/
+                  ln -sf /usr/lib/libhtraapi.so.${VERSION} /usr/lib/libhtraapi.so.${MAJOR}
+                  ln -sf /usr/lib/libhtraapi.so.${MAJOR} /usr/lib/libhtraapi.so
+                  
+                  # Copy header
+                  cp -v /opt/htraapi/inc/htra_api.h /usr/include/
+                  
+                  # Update linker cache
+                  ldconfig
+                  
+                  # Verify installation
+                  echo "[+] Harogic HTRA API installed:"
+                  ls -l /usr/lib/libhtraapi.so*
+                  ls -l /usr/include/htra_api.h
+                  ldconfig -p | grep htraapi
+              else
+                  echo "[!] Harogic library files not found, skipping"
+              fi
+          fi
+          
+          echo "[+] SDR libraries installed, checking what URH will detect:"
+          ldconfig -p | grep -E "(rtlsdr|hackrf|airspy|iio|limesuite|bladerf|uhd|hydrasdr|htraapi)" || echo "Some libraries may not be visible yet"
+          
+          echo "[+] Updating linker cache before URH build"
+          ldconfig
+          
+          echo "[+] Verifying library availability:"
+          pkg-config --exists librtlsdr && echo "  ✓ RTL-SDR" || echo "  ✗ RTL-SDR"
+          pkg-config --exists libhackrf && echo "  ✓ HackRF" || echo "  ✗ HackRF"
+          pkg-config --exists libiio && echo "  ✓ PlutoSDR (libiio)" || echo "  ✗ PlutoSDR"
+          pkg-config --exists LimeSuite && echo "  ✓ LimeSDR" || echo "  ✗ LimeSDR"
+          pkg-config --exists libbladeRF && echo "  ✓ BladeRF" || echo "  ✗ BladeRF"
+          pkg-config --exists uhd && echo "  ✓ USRP (UHD)" || echo "  ✗ USRP"
+          ldconfig -p | grep -q libhydrasdr && echo "  ✓ HydraSDR" || echo "  ✗ HydraSDR"
+          ldconfig -p | grep -q libfcd && echo "  ✓ FUNcube Dongle" || echo "  ✗ FUNcube Dongle"
+          ldconfig -p | grep -q libhtraapi && echo "  ✓ Harogic" || echo "  ✗ Harogic"
+          
+          echo "[+] Header files check:"
+          [ -f /usr/include/hydrasdr.h ] && echo "  ✓ hydrasdr.h" || echo "  ✗ hydrasdr.h"
+          [ -f /usr/include/fcd.h ] && echo "  ✓ fcd.h (FUNcube)" || echo "  ✗ fcd.h"
+          [ -f /usr/include/htra_api.h ] && echo "  ✓ htra_api.h" || echo "  ✗ htra_api.h"
+          
+          cp -r /workspace-ro /workspace
+          cd /workspace
+
+          URH_VENV_DIR="/opt/urh-venv"
+
+          echo "[+] Creating venv"
+          python3 -m venv "$URH_VENV_DIR"
+
+          PYTHON_VERSION=$(/opt/urh-venv/bin/python -c "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')")
+          ln -s /usr/lib/python3/dist-packages/PyQt5 /opt/urh-venv/lib/$PYTHON_VERSION/site-packages/ # little hack to use system PyQt5 lib
+
+          source "$URH_VENV_DIR/bin/activate"
+          
+          echo "[+] Upgrading pip and installing build dependencies"
+          pip install --upgrade pip setuptools wheel
+          
+          echo "[+] Installing Cython and NumPy"
+          pip install cython numpy
+          
+          #echo "[+] Installing PyQt5"
+          # Allow building from source if no wheel available (for ARM64/RISC-V)
+          #pip install pyqt5 || {
+          #    echo "[!] PyQt5 installation failed, GUI may not work"
+          #    echo "[!] Users can manually install: apt install python3-pyqt5"
+          #}
+          pip install PyQt6 PyQt6-Qt6 PyQt6-sip
+          
+          echo "[+] Installing psutil"
+          pip install psutil
+          
+          echo "[+] Pre-build library check (what setup.py will see):"
+          echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}"
+          python3 -c "from ctypes.util import find_library; print('libhtraapi:', find_library('htraapi'))"
+          python3 -c "from ctypes.util import find_library; print('libhydrasdr:', find_library('hydrasdr'))"
+          python3 -c "from ctypes.util import find_library; print('libfcd:', find_library('fcd'))"
+          python3 -c "from ctypes.util import find_library; print('librtlsdr:', find_library('rtlsdr'))"
+          python3 -c "from ctypes.util import find_library; print('libhackrf:', find_library('hackrf'))"
+          
+          echo "[+] Building URH with native extensions"
+          BUILD_TYPE="failed"
+          if python3 setup.py install 2>&1 | tee /tmp/build.log; then
+              if [ -f "$URH_VENV_DIR/bin/urh" ]; then
+                  echo "[+] Build successful with native extensions"
+                  BUILD_TYPE="native"
+              fi
+          fi
+          
+          if [ "$BUILD_TYPE" = "failed" ]; then
+              echo "[!] Cython build failed, trying without native extensions"
+              rm -rf build/ src/urh.egg-info/
+              export URH_NO_NATIVE_EXTENSIONS=1
+              python3 setup.py install
+              if [ -f "$URH_VENV_DIR/bin/urh" ]; then
+                  BUILD_TYPE="no-native"
+              fi
+          fi
+          
+          deactivate
+          
+          if [ ! -f "$URH_VENV_DIR/bin/urh" ]; then
+              echo "[!] ERROR: URH not installed"
+              exit 1
+          fi
+          
+          echo "[+] URH installed successfully with $BUILD_TYPE extensions"
+          
+          echo "[+] Checking compiled native extensions:"
+          find "$URH_VENV_DIR/lib/python3.12/site-packages/urh" -name "*.so" | while read so_file; do
+              basename "$so_file"
+          done | sort || echo "No .so files found (pure Python build)"
+          
+          echo "[+] Creating package"
+          ARCH=$(dpkg --print-architecture)
+          PKG_NAME="urh-penthertz_${ARCH}_${DEB_VERSION}"
+          PKG_DIR="/tmp/pkg"
+          
+          mkdir -p "${PKG_DIR}/DEBIAN"
+          mkdir -p "${PKG_DIR}/opt"
+          mkdir -p "${PKG_DIR}/usr/sbin"
+          mkdir -p "${PKG_DIR}/usr/share/applications"
+          mkdir -p "${PKG_DIR}/usr/share/doc/urh-penthertz"
+          
+          cp -a "$URH_VENV_DIR" "${PKG_DIR}/opt/"
+          
+          cat > "${PKG_DIR}/usr/sbin/urh" << 'WRAPPER'
+          #!/bin/bash
+          URH_VENV_DIR="/opt/urh-venv"
+          if [ ! -d "$URH_VENV_DIR" ]; then
+              echo "Error: URH venv not found"
+              exit 1
+          fi
+          if [ -z "$XDG_RUNTIME_DIR" ]; then
+              export XDG_RUNTIME_DIR="/tmp/runtime-$(whoami)"
+              mkdir -p "$XDG_RUNTIME_DIR"
+              chmod 700 "$XDG_RUNTIME_DIR"
+          fi
+          source "$URH_VENV_DIR/bin/activate"
+          exec "$URH_VENV_DIR/bin/urh" "$@"
+          WRAPPER
+          
+          chmod +x "${PKG_DIR}/usr/sbin/urh"
+          
+          cat > "${PKG_DIR}/usr/share/applications/urh.desktop" << 'DESKTOP'
+          [Desktop Entry]
+          Type=Application
+          Name=Universal Radio Hacker
+          Exec=urh
+          Icon=urh
+          Terminal=false
+          Categories=Network;
+          DESKTOP
+          
+          cat > "${PKG_DIR}/DEBIAN/control" << CONTROL
+          Package: urh-penthertz
+          Version: ${DEB_VERSION}
+          Section: comm
+          Priority: optional
+          Architecture: ${ARCH}
+          Depends: python3-venv, python3
+          Recommends: rtl-sdr, hackrf, limesuite, uhd-host
+          Maintainer: PentHertz <contact@penthertz.com>
+          Description: Universal Radio Hacker (PentHertz Fork)
+           URH is a complete suite for wireless protocol investigation.
+           .
+           This build includes native support for:
+            * RTL-SDR (RTL2832U)
+            * HackRF One
+            * AirSpy (R2, Mini, HF+)
+            * PlutoSDR (via libiio)
+            * LimeSDR
+            * BladeRF (1.0, 2.0)
+            * USRP (UHD)
+            * FUNcube Dongle
+            * HydraSDR
+            * Harogic spectrum analyzers
+           .
+           Build type: ${BUILD_TYPE} extensions
+           Architecture: ${ARCH}
+           .
+           PyQt5 is included in the venv for GUI support.
+          Homepage: https://github.com/PentHertz/urh
+          CONTROL
+          
+          cat > "${PKG_DIR}/usr/share/doc/urh-penthertz/copyright" << 'COPYRIGHT'
+          Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+          Upstream-Name: urh
+          Source: https://github.com/PentHertz/urh
+          Files: *
+          Copyright: 2016-2024 Johannes Pohl and contributors
+          License: GPL-3+
+          COPYRIGHT
+          
+          dpkg-deb --build "${PKG_DIR}" "/output/${PKG_NAME}.deb"
+          
+          echo "=== Build Complete ==="
+          ls -lh /output/
+          BUILDSCRIPT
+          
+          chmod +x build.sh
+          mkdir -p output
+          
+          docker run --rm \
+            --platform "${{ steps.platform.outputs.platform }}" \
+            -v "$(pwd):/workspace-ro:ro" \
+            -v "$(pwd)/build.sh:/build.sh:ro" \
+            -v "$(pwd)/output:/output" \
+            -e DEB_VERSION="${{ steps.version.outputs.deb_version }}" \
+            ubuntu:24.04 \
+            bash /build.sh
+      
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: urh-${{ matrix.arch }}-${{ steps.version.outputs.deb_version }}
+          path: output/*.deb
+      
+      - name: Show result
+        run: |
+          echo "Package built for ${{ matrix.arch }}"
+          ls -lh output/
+  
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: success()
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Get version
+        id: version
+        run: |
+          cat > get_version.py << 'EOF'
+          import re
+          with open('setup.py') as f:
+              content = f.read()
+          match = re.search(r'version\s*=\s*["\x27]([^"\x27]+)["\x27]', content)
+          print(match.group(1) if match else '2.9.8')
+          EOF
+          VERSION=$(python3 get_version.py)
+          DATE=$(date +%Y%m%d)
+          COMMIT=$(git rev-parse --short HEAD)
+          DEB_VERSION="${VERSION}+git${DATE}.${COMMIT}"
+          echo "deb_version=${DEB_VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "date=${DATE}" >> $GITHUB_OUTPUT
+          echo "commit=${COMMIT}" >> $GITHUB_OUTPUT
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-packages
+      
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          find release-packages -name "*.deb" -exec cp {} release-files/ \;
+          ls -lh release-files/
+          
+          # Create checksums
+          cd release-files
+          sha256sum *.deb > SHA256SUMS
+          cat SHA256SUMS
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: URH PentHertz v${{ steps.version.outputs.version }}
+          body: |
+            # URH Multi-Architecture Packages
+            
+            **Version:** ${{ steps.version.outputs.version }}  
+            **Build Date:** ${{ steps.version.outputs.date }}  
+            **Commit:** ${{ steps.version.outputs.commit }}
+            
+            ## 📦 Packages
+            
+            - `urh-penthertz_amd64_*.deb` - For AMD64/x86_64 systems
+            - `urh-penthertz_arm64_*.deb` - For ARM64/aarch64 systems  
+            - `urh-penthertz_riscv64_*.deb` - For RISC-V 64-bit systems
+            
+            ## 🚀 Quick Download
+            
+            ```bash
+            # AMD64
+            wget https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/urh-penthertz_amd64_${{ steps.version.outputs.deb_version }}.deb
+            
+            # ARM64
+            wget https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/urh-penthertz_arm64_${{ steps.version.outputs.deb_version }}.deb
+            
+            # RISC-V
+            wget https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/urh-penthertz_riscv64_${{ steps.version.outputs.deb_version }}.deb
+            
+            # Install
+            sudo dpkg -i urh-penthertz_*.deb
+            sudo apt-get install -f
+            
+            # Run
+            urh
+            ```
+            
+            ## 💡 Permanent Download URL
+            
+            This release always uses the tag **v${{ steps.version.outputs.version }}** for easy downloading.  
+            Just update the date+commit in the filename to get the latest build:
+            
+            ```bash
+            # URL pattern (only date+commit changes between builds):
+            https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/urh-penthertz_ARCH_VERSION.deb
+            ```
+            
+            ## ✨ Features
+            
+            - **Native SDR Support:** RTL-SDR, HackRF, AirSpy, PlutoSDR, LimeSDR, BladeRF, USRP, FUNcube Dongle, HydraSDR, Harogic
+            - **Cython Extensions:** Optimized signal processing
+            - **Complete GUI:** PyQt5 interface included
+            - **Self-contained:** All dependencies in venv
+            
+            ## 📋 System Requirements
+            
+            - Ubuntu 24.04 or compatible Debian-based system
+            - Python 3.12
+            - Qt5 runtime libraries (auto-installed)
+            
+            ## 🔍 Verification
+            
+            ```bash
+            # Download checksums
+            wget https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/SHA256SUMS
+            
+            # Verify
+            sha256sum -c SHA256SUMS
+            ```
+            
+            ## 📚 Documentation
+            
+            - [GitHub Repository](https://github.com/${{ github.repository }})
+            - [Original URH](https://github.com/jopohl/urh)
+          draft: false
+          prerelease: false
+          files: |
+            release-files/*.deb
+            release-files/SHA256SUMS
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
