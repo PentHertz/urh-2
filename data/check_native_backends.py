@@ -23,6 +23,7 @@ for sdr in (
     "LimeSDR",
     "PlutoSDR",
     "SDRPlay",
+    "HydraSDR",
     "USRP",
 ):
     try:

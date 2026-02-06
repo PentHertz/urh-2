@@ -31,6 +31,11 @@ RUN export AIRSPY_VERSION="1.0.9" \
  && cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_FLAGS="-Wno-maybe-uninitialized -Wno-calloc-transposed-args" -S /tmp/bladeRF-$BLADERF_VERSION/host -B /tmp/build_blade \
  && make -j$(nproc) -C /tmp/build_blade \
  && make -C /tmp/build_blade install \
+  # HydraSDR
+ && git clone https://github.com/hydrasdr/rfone_host.git /tmp/rfone_host
+ && cmake3 -Wno-dev -S /tmp/rfone_host -B /tmp/build_rfone_host \
+ && make -j$(nproc) -C /tmp/build_rfone_host \
+ && make -C /tmp/build_rfone_host install \
  # Lime
  && wget https://github.com/myriadrf/LimeSuite/archive/v$LIMESUITE_VERSION.tar.gz -O /tmp/lime.tar.gz \
  && tar xf /tmp/lime.tar.gz -C /tmp \

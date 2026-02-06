@@ -20,6 +20,7 @@ COMPILER_DIRECTIVES = {
 }
 
 DEVICES = {
+    "hydrasdr": {"lib": "hydrasdr", "test_function": "open"},
     "airspy": {"lib": "airspy", "test_function": "open"},
     "bladerf": {
         "lib": "bladeRF",
@@ -34,6 +35,10 @@ DEVICES = {
                     printf("%f", result.major + result.minor/10.0 + result.patch/100.0);
                     return 0;}
                     """,
+    },
+    "harogic": {
+        "lib": "htraapi",
+        "test_function": "Device_Open"
     },
     "hackrf": {
         "lib": "hackrf",

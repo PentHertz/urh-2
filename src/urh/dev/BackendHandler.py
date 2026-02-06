@@ -103,6 +103,8 @@ class BackendHandler(object):
         "SDRPlay",
         "SoundCard",
         "USRP",
+        "Harogic",
+        "HydraSDR",
     )
 
     def __init__(self):
@@ -239,6 +241,23 @@ class BackendHandler(object):
         except ImportError:
             return False
 
+    @property
+    def __hydrasdr_native_enabled(self) -> bool:
+        try:
+            from urh.dev.native.lib import hydrasdr
+
+            return True
+        except ImportError:
+            return False
+
+    @property
+    def __harogic_native_enabled(self) -> bool:
+        try:
+            from urh.dev.native.lib import harogic
+            return True
+        except ImportError:
+            return False
+
     def __check_gr_python_interpreter(self, interpreter):
         # Use shell=True to prevent console window popping up on windows
         return (
@@ -333,6 +352,14 @@ class BackendHandler(object):
 
         if devname.lower() == "sdrplay" and self.__sdrplay_native_enabled:
             supports_rx, supports_tx = True, False
+            backends.add(Backends.native)
+
+        if devname.lower().startswith("hydrasdr") and self.__hydrasdr_native_enabled:
+            supports_rx, supports_tx = True, False
+            backends.add(Backends.native)
+
+        if devname.lower().startswith("harogic") and self.__harogic_native_enabled:
+            supports_rx, supports_tx = True, False # RX only for now
             backends.add(Backends.native)
 
         if devname.lower() == "soundcard" and self.__soundcard_enabled:
