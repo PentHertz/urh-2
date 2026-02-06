@@ -63,7 +63,7 @@ jobs:
               qt6-base-dev libgl1-mesa-dev libxkbcommon-x11-0 libegl1 libxcb-cursor0 \
               build-essential cython3 git cmake wget unzip \
               libxml2-dev libxslt1-dev zlib1g-dev \
-              dpkg-dev fakeroot python3-pyqt5 python3-pyqt5.qtopengl python3-pyqt5.qtsvg
+              dpkg-dev fakeroot python3-pyqt6 python3-pyqt6.sip python3-pyqt6.qtsvg
           
           echo "[+] Installing SDR libraries for native support"
           DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -179,7 +179,7 @@ jobs:
           python3 -m venv "$URH_VENV_DIR"
 
           PYTHON_VERSION=$(/opt/urh-venv/bin/python -c "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')")
-          ln -s /usr/lib/python3/dist-packages/PyQt5 /opt/urh-venv/lib/$PYTHON_VERSION/site-packages/ # little hack to use system PyQt5 lib
+          ln -s /usr/lib/python3/dist-packages/PyQt6 /opt/urh-venv/lib/$PYTHON_VERSION/site-packages/ # little hack to use system PyQt6 lib
 
           source "$URH_VENV_DIR/bin/activate"
           
@@ -195,7 +195,7 @@ jobs:
           #    echo "[!] PyQt5 installation failed, GUI may not work"
           #    echo "[!] Users can manually install: apt install python3-pyqt5"
           #}
-          pip install PyQt6 PyQt6-Qt6 PyQt6-sip
+          #pip install PyQt6 PyQt6-Qt6 PyQt6-sip
           
           echo "[+] Installing psutil"
           pip install psutil
