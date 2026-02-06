@@ -2,21 +2,21 @@ import numpy as np
 from multiprocessing.connection import Connection
 from collections import OrderedDict
 
-from urh.dev.native.Device import Device
+from urh.dev.native.Devicewp import Devicewp
 from urh.dev.native.lib import harogic
 from urh.util.Logger import logger
 
 
-class Harogic(Device):
+class Harogic(Devicewp):
     DEVICE_LIB = harogic
     ASYNCHRONOUS = False
     DATA_TYPE = np.float32
     DEVICE_METHODS = {
-        Device.Command.SET_FREQUENCY.name: "set_frequency",
-        Device.Command.SET_RF_GAIN.name: "set_ref_level",
-        Device.Command.SET_ANTENNA_INDEX.name: "set_data_format",
-        Device.Command.SET_IF_GAIN.name: "set_if_agc",
-        Device.Command.SET_BB_GAIN.name: "set_preamp",
+        Devicewp.Command.SET_FREQUENCY.name: "set_frequency",
+        Devicewp.Command.SET_RF_GAIN.name: "set_ref_level",
+        Devicewp.Command.SET_ANTENNA_INDEX.name: "set_data_format",
+        Devicewp.Command.SET_IF_GAIN.name: "set_if_agc",
+        Devicewp.Command.SET_BB_GAIN.name: "set_preamp",
     }
     
     # These class-level variables will exist only in the backend process
@@ -72,12 +72,12 @@ class Harogic(Device):
     @classmethod
     def prepare_sync_receive(cls, ctrl_connection: Connection, dev_parameters: OrderedDict):
         # This function runs once at the start of the backend process
-        freq = dev_parameters[Device.Command.SET_FREQUENCY.name]
-        srate = dev_parameters[Device.Command.SET_SAMPLE_RATE.name]
-        gain = dev_parameters[Device.Command.SET_RF_GAIN.name]
-        if_gain = dev_parameters[Device.Command.SET_IF_GAIN.name]
-        bb_gain = dev_parameters[Device.Command.SET_BB_GAIN.name]
-        format_index = dev_parameters.get(Device.Command.SET_ANTENNA_INDEX.name, 1)
+        freq = dev_parameters[Devicewp.Command.SET_FREQUENCY.name]
+        srate = dev_parameters[Devicewp.Command.SET_SAMPLE_RATE.name]
+        gain = dev_parameters[Devicewp.Command.SET_RF_GAIN.name]
+        if_gain = dev_parameters[Devicewp.Command.SET_IF_GAIN.name]
+        bb_gain = dev_parameters[Devicewp.Command.SET_BB_GAIN.name]
+        format_index = dev_parameters.get(Devicewp.Command.SET_ANTENNA_INDEX.name, 1)
 
         # Store sample rate and calculate skip factor to prevent UI overload
         cls._sample_rate = srate
