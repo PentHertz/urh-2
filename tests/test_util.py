@@ -163,9 +163,6 @@ class TestUtil(QtTestCase):
         from urh.dev.native.lib import airspy
 
         # noinspection PyUnresolvedReferences
-        from urh.dev.native.lib import hydrasdr
-
-        # noinspection PyUnresolvedReferences
         from urh.dev.native.lib import bladerf
 
         # noinspection PyUnresolvedReferences
@@ -186,4 +183,20 @@ class TestUtil(QtTestCase):
         if sys.platform != "darwin":
             # noinspection PyUnresolvedReferences
             from urh.dev.native.lib import sdrplay
+
+        # Backends that require external SDKs — may not be compiled
+        # on all platforms (Windows CI lacks HydraSDR/Harogic DLLs,
+        # manylinux Docker lacks their .so files)
+        for optional in ("hydrasdr", "harogic", "signalhound"):
+            try:
+                __import__(
+                    "urh.dev.native.lib." + optional,
+                    fromlist=[optional],
+                )
+                logger.info(f"{optional}: available")
+            except ImportError:
+                logger.info(
+                    f"{optional}: not compiled on this platform"
+                )
+
         self.assertTrue(True)

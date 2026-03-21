@@ -56,11 +56,9 @@ class SimulatorExpressionParser(QObject):
 
         try:
             node = ast.parse(expr, mode="eval").body
-            (
-                self.validate_formula_node(node)
-                if is_formula
-                else self.validate_condition_node(node)
-            )
+            self.validate_formula_node(
+                node
+            ) if is_formula else self.validate_condition_node(node)
         except SyntaxError as err:
             valid = False
             message = (

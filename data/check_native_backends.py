@@ -34,13 +34,23 @@ for sdr in (
     "USRP",
 ):
     try:
-        importlib.import_module(".{}".format(sdr.lower()), "urh.dev.native.lib")
+        importlib.import_module(
+            ".{}".format(sdr.lower()), "urh.dev.native.lib"
+        )
         print("{:<10} \033[92mSUCCESS\033[0m".format(sdr + ":"))
     except ImportError as e:
         if sdr in OPTIONAL_SDRS:
-            print("{:<10} \033[93mSKIPPED\033[0m ({})".format(sdr + ":", e))
+            print(
+                "{:<10} \033[93mSKIPPED\033[0m ({})".format(
+                    sdr + ":", e
+                )
+            )
         else:
-            print("{:<10} \033[91mFAILURE\033[0m ({})".format(sdr + ":", e))
+            print(
+                "{:<10} \033[91mFAILURE\033[0m ({})".format(
+                    sdr + ":", e
+                )
+            )
             rc = 1
 
 sys.exit(rc)

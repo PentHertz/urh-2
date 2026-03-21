@@ -255,7 +255,6 @@ class BackendHandler(object):
     def __harogic_native_enabled(self) -> bool:
         try:
             from urh.dev.native.lib import harogic
-
             return True
         except ImportError:
             return False
@@ -373,10 +372,7 @@ class BackendHandler(object):
             supports_rx, supports_tx = True, False
             backends.add(Backends.native)
 
-        if (
-            devname.lower().startswith("signalhound")
-            and self.__signalhound_native_enabled
-        ):
+        if devname.lower().startswith("signalhound") and self.__signalhound_native_enabled:
             supports_rx, supports_tx = True, False
             backends.add(Backends.native)
 
