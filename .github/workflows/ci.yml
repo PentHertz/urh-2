@@ -58,7 +58,40 @@ jobs:
           if [[ $OS == ubuntu* ]]
           then
             sudo apt-get update
-            sudo apt-get install libhackrf-dev librtlsdr-dev xvfb libxkbcommon-x11-0 x11-utils libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libegl1 libxcb-cursor0
+            sudo apt-get install libhackrf-dev librtlsdr-dev libusb-1.0-0-dev xvfb libxkbcommon-x11-0 x11-utils libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libegl1 libxcb-cursor0
+
+            # Install HydraSDR library
+            cd /tmp
+            git clone https://github.com/hydrasdr/hydrasdr-host.git
+            cd hydrasdr-host && mkdir -p build && cd build
+            cmake .. -DCMAKE_INSTALL_PREFIX=/usr
+            make -j$(nproc) && sudo make install
+            sudo ldconfig
+            sudo ln -sf /usr/include/libhydrasdr/hydrasdr.h /usr/include/hydrasdr.h
+            sudo ln -sf /usr/include/libhydrasdr/hydrasdr_commands.h /usr/include/hydrasdr_commands.h
+            cd $GITHUB_WORKSPACE
+
+            # Install Harogic HTRA API
+            cd /tmp
+            wget -q https://github.com/PentHertz/rfswift_harogic_install/releases/download/v0.55.63/Install_HTRA_SDK.zip
+            unzip -q Install_HTRA_SDK.zip && cd Install_HTRA_SDK/
+            sudo mkdir -p /opt/htraapi
+            sudo cp -r htraapi/* /opt/htraapi/
+            cd /opt/htraapi/lib/x86_64
+            LIB_FILE=$(ls libhtraapi.so.* 2>/dev/null | head -1)
+            if [ -n "$LIB_FILE" ]; then
+                VERSION=${LIB_FILE#*so.}
+                MAJOR=${VERSION%%.*}
+                sudo ln -sf libhtraapi.so.${VERSION} libhtraapi.so.${MAJOR}
+                sudo ln -sf libhtraapi.so.${MAJOR} libhtraapi.so
+                sudo cp libhtraapi.so.${VERSION} /usr/lib/
+                sudo ln -sf /usr/lib/libhtraapi.so.${VERSION} /usr/lib/libhtraapi.so.${MAJOR}
+                sudo ln -sf /usr/lib/libhtraapi.so.${MAJOR} /usr/lib/libhtraapi.so
+                sudo cp /opt/htraapi/inc/htra_api.h /usr/include/
+                sudo ldconfig
+            fi
+            cd $GITHUB_WORKSPACE
+
             pip install PyVirtualDisplay==0.2.5
           elif [[ $OS == windows* ]]
           then
