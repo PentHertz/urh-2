@@ -71,24 +71,35 @@ jobs:
             sudo ln -sf /usr/include/libhydrasdr/hydrasdr_commands.h /usr/include/hydrasdr_commands.h
             cd $GITHUB_WORKSPACE
 
-            # Install Harogic HTRA API
+            # Install Harogic HTRA API (supports x86_64 and aarch64)
             cd /tmp
             wget -q https://github.com/PentHertz/rfswift_harogic_install/releases/download/v0.55.63/Install_HTRA_SDK.zip
             unzip -q Install_HTRA_SDK.zip && cd Install_HTRA_SDK/
             sudo mkdir -p /opt/htraapi
             sudo cp -r htraapi/* /opt/htraapi/
-            cd /opt/htraapi/lib/x86_64
-            LIB_FILE=$(ls libhtraapi.so.* 2>/dev/null | head -1)
-            if [ -n "$LIB_FILE" ]; then
-                VERSION=${LIB_FILE#*so.}
-                MAJOR=${VERSION%%.*}
-                sudo ln -sf libhtraapi.so.${VERSION} libhtraapi.so.${MAJOR}
-                sudo ln -sf libhtraapi.so.${MAJOR} libhtraapi.so
-                sudo cp libhtraapi.so.${VERSION} /usr/lib/
-                sudo ln -sf /usr/lib/libhtraapi.so.${VERSION} /usr/lib/libhtraapi.so.${MAJOR}
-                sudo ln -sf /usr/lib/libhtraapi.so.${MAJOR} /usr/lib/libhtraapi.so
-                sudo cp /opt/htraapi/inc/htra_api.h /usr/include/
-                sudo ldconfig
+            ARCH=$(uname -m)
+            case "$ARCH" in
+                x86_64|amd64)  SDK_ARCH="x86_64" ;;
+                aarch64|arm64) SDK_ARCH="aarch64" ;;
+                armv7*)        SDK_ARCH="armv7" ;;
+                *)             SDK_ARCH="" ;;
+            esac
+            if [ -n "$SDK_ARCH" ] && [ -d "/opt/htraapi/lib/${SDK_ARCH}" ]; then
+                cd /opt/htraapi/lib/${SDK_ARCH}
+                LIB_FILE=$(ls libhtraapi.so.* 2>/dev/null | head -1)
+                if [ -n "$LIB_FILE" ]; then
+                    VERSION=${LIB_FILE#*so.}
+                    MAJOR=${VERSION%%.*}
+                    sudo ln -sf libhtraapi.so.${VERSION} libhtraapi.so.${MAJOR}
+                    sudo ln -sf libhtraapi.so.${MAJOR} libhtraapi.so
+                    sudo cp libhtraapi.so.${VERSION} /usr/lib/
+                    sudo ln -sf /usr/lib/libhtraapi.so.${VERSION} /usr/lib/libhtraapi.so.${MAJOR}
+                    sudo ln -sf /usr/lib/libhtraapi.so.${MAJOR} /usr/lib/libhtraapi.so
+                    sudo cp /opt/htraapi/inc/htra_api.h /usr/include/
+                    sudo ldconfig
+                fi
+            else
+                echo "[!] Harogic SDK not available for ${ARCH}, skipping"
             fi
             cd $GITHUB_WORKSPACE
 

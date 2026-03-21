@@ -167,15 +167,32 @@ DEVICE_CONFIG["HydraSDR"] = {
 # https://www.harogic.com/
 DEVICE_CONFIG["Harogic"] = {
     "center_freq": dev_range(start=9 * K, stop=40 * G, step=1),
-    "sample_rate": [125e6 / (1 << i) for i in range(17)],  # Decimation 1 to 2^16 (API max)
+    "sample_rate": [
+        125e6 / (1 << i) for i in range(17)
+    ],  # Decimation 1 to 2^16 (API max)
     "bandwidth": [100 * M, 100*M], # Not adjustable in IQS mode
     "rx_rf_gain": list(range(-100, 8)), # Maps to Ref Level
     "rx_if_gain": [0, 1], # Maps to IF AGC Off/On
     "rx_baseband_gain": [0, 1], # Maps to Preamp ForcedOff/AutoOn
-    "rx_antenna": ["Complex 8-bit (uint8)", "Complex 16-bit (int16)", "Complex 32-bit (int32)"],
+    "rx_antenna": [
+        "Complex 8-bit (uint8)",
+        "Complex 16-bit (int16)",
+        "Complex 32-bit (int32)",
+    ],
     "rx_antenna_default_index": 1,
     "default_sample_rate": 125e6 / 64,
     "default_rx_rf_gain": -10,
+}
+
+# https://signalhound.com/
+DEVICE_CONFIG["SignalHound"] = {
+    "center_freq": dev_range(start=9 * K, stop=6400 * M, step=1),
+    # 40 MS/s base rate / decimation (powers of 2, 1-8192)
+    "sample_rate": [40e6 / (1 << i) for i in range(14)],
+    "bandwidth": [27 * M, 27 * M],
+    "rx_rf_gain": list(range(-100, 21)),  # Reference level in dBm
+    "default_sample_rate": 40e6 / 8,
+    "default_rx_rf_gain": -30,
 }
 
 DEVICE_CONFIG["SoundCard"] = {

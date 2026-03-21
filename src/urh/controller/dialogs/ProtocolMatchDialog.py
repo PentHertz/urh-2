@@ -169,9 +169,16 @@ class ProtocolMatchDialog(QDialog):
                 lines.append(f"Sync word: 0x{entry['sync_bytes']}")
 
             if match.recommended_decoder:
-                lines.append(f"<br><b>Recommended decoder:</b> {match.recommended_decoder.name}")
+                lines.append(
+                    f"<br><b>Recommended decoder:</b>"
+                    f" {match.recommended_decoder.name}"
+                )
             if match.leading_zeros_count > 0:
-                lines.append(f"<b>Leading zeros:</b> {match.leading_zeros_count} bits (will be labeled as noise)")
+                lines.append(
+                    f"<b>Leading zeros:</b>"
+                    f" {match.leading_zeros_count} bits"
+                    f" (will be labeled as noise)"
+                )
 
             lines.append("")
             lines.append("<b>Scoring details:</b>")

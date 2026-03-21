@@ -225,7 +225,10 @@ class ProtocolMatcher:
             for dec in self.available_decodings:
                 if dec.name not in candidate_names:
                     # Also allow partial name matches
-                    if not any(cn in dec.name or dec.name in cn for cn in candidate_names):
+                    if not any(
+                        cn in dec.name or dec.name in cn
+                        for cn in candidate_names
+                    ):
                         continue
 
                 if dec.name not in decoded_cache:
@@ -369,7 +372,7 @@ class ProtocolMatcher:
 
         return best_decoder, 1.0 - best_score, best_explanation
 
-    # ── Feature extraction ───────────────────────────────────────────
+    # ── Feature extraction ────────────────────────────────
 
     def _extract_message_features(self) -> dict:
         """Extract features from messages for matching."""
@@ -523,7 +526,7 @@ class ProtocolMatcher:
             return ""
         return sync_word
 
-    # ── Protocol scoring ─────────────────────────────────────────────
+    # ── Protocol scoring ───────────────────────────────────────
 
     def _score_protocol(self, proto: dict, features: dict) -> Tuple[float, dict]:
         """Score how well a protocol matches the extracted features."""
@@ -573,7 +576,10 @@ class ProtocolMatcher:
             if len_diff <= tolerance:
                 len_score = max(0, 1.0 - len_diff / tolerance)
                 score += weight * len_score
-                details["length"] = f"{which} vs proto={proto_len} ({int(len_score * 100)}%)"
+                details["length"] = (
+                    f"{which} vs proto={proto_len}"
+                    f" ({int(len_score * 100)}%)"
+                )
             else:
                 details["length"] = f"{which} vs proto={proto_len} (no match)"
             weights_used += weight
@@ -640,7 +646,7 @@ class ProtocolMatcher:
 
         return min(score, 1.0), details
 
-    # ── Decoder selection ────────────────────────────────────────────
+    # ── Decoder selection ──────────────────────────────────────
 
     def _find_best_decoder(self, proto: dict, features: dict) -> Optional[Encoding]:
         """Find the best URH decoder for a protocol based on its modulation."""
@@ -655,7 +661,11 @@ class ProtocolMatcher:
         # Special cases based on protocol name
         proto_name = proto.get("name", "").lower()
         if "manchester" in proto_name:
-            candidate_names = ["Manchester I", "Manchester II", "Differential Manchester"] + candidate_names
+            candidate_names = [
+                "Manchester I",
+                "Manchester II",
+                "Differential Manchester",
+            ] + candidate_names
         if "differential" in proto_name:
             candidate_names = ["Differential Manchester"] + candidate_names
 
@@ -708,7 +718,7 @@ class ProtocolMatcher:
 
         return total_errors / total_bits if total_bits > 0 else 1.0
 
-    # ── Known protocol bitstream layouts ─────────────────────────────
+    # ── Known protocol bitstream layouts ───────────────────────
     # Maps protocol names (substring match) to their actual bit layout.
     # Each entry: (field_name, bit_count, bit_order, endianness, display_format)
     #   bit_order: 0=MSB, 1=LSB
@@ -731,7 +741,7 @@ class ProtocolMatcher:
         ],
     }
 
-    # ── Label/MessageType building ───────────────────────────────────
+    # ── Label/MessageType building ─────────────────────────────
 
     def build_labels_from_match(self, match: ProtocolMatch) -> Optional[MessageType]:
         """
@@ -981,7 +991,7 @@ class ProtocolMatcher:
 
         return mt
 
-    # ── Utility functions ────────────────────────────────────────────
+    # ── Utility functions ──────────────────────────────────────
 
 
     @staticmethod
@@ -1010,7 +1020,7 @@ class ProtocolMatcher:
         return matches / max(len(h1), len(h2))
 
 
-# ── Module-level helpers ─────────────────────────────────────────────
+# ── Module-level helpers ──────────────────────────────────────
 
 def _auto_display_format(field_bits: int, field_name: str = "") -> int:
     """

@@ -105,6 +105,7 @@ class BackendHandler(object):
         "USRP",
         "Harogic",
         "HydraSDR",
+        "SignalHound",
     )
 
     def __init__(self):
@@ -258,6 +259,15 @@ class BackendHandler(object):
         except ImportError:
             return False
 
+    @property
+    def __signalhound_native_enabled(self) -> bool:
+        try:
+            from urh.dev.native.lib import signalhound
+
+            return signalhound._load_lib()
+        except ImportError:
+            return False
+
     def __check_gr_python_interpreter(self, interpreter):
         # Use shell=True to prevent console window popping up on windows
         return (
@@ -359,7 +369,11 @@ class BackendHandler(object):
             backends.add(Backends.native)
 
         if devname.lower().startswith("harogic") and self.__harogic_native_enabled:
-            supports_rx, supports_tx = True, False # RX only for now
+            supports_rx, supports_tx = True, False
+            backends.add(Backends.native)
+
+        if devname.lower().startswith("signalhound") and self.__signalhound_native_enabled:
+            supports_rx, supports_tx = True, False
             backends.add(Backends.native)
 
         if devname.lower() == "soundcard" and self.__soundcard_enabled:

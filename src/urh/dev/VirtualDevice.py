@@ -270,6 +270,18 @@ class VirtualDevice(QObject):
                         baseband_gain=baseband_gain,
                         resume_on_full_receive_buffer=resume_on_full_receive_buffer,
                     )
+                elif name.startswith("signalhound"):
+                    from urh.dev.native.SignalHound import SignalHound
+
+                    self.__dev = SignalHound(
+                        center_freq=freq,
+                        sample_rate=sample_rate,
+                        bandwidth=bandwidth,
+                        gain=gain,
+                        if_gain=if_gain,
+                        baseband_gain=baseband_gain,
+                        resume_on_full_receive_buffer=resume_on_full_receive_buffer,
+                    )
                 elif name == "soundcard":
                     from urh.dev.native.SoundCard import SoundCard
 
