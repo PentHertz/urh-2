@@ -159,7 +159,7 @@ DEVICE_CONFIG["HydraSDR"] = {
             for d in [1, 2, 4, 8, 16, 32, 64]
         )
     ),
-    "bandwidth": [10 * M, 10 * M],
+    # Bandwidth auto-selected by the library based on sample rate
     "rx_rf_gain": list(range(0, 16)),
     "rx_if_gain": list(range(0, 16)),
     "rx_baseband_gain": list(range(0, 16)),

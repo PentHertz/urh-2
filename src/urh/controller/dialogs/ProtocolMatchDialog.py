@@ -39,7 +39,7 @@ class ProtocolMatchDialog(QDialog):
 
         # Header
         header = QLabel(
-            "Protocol matches found based on rtl_433 database analysis.\n"
+            "Protocol matches found from the PHZ database (327 protocols).\n"
             "Select a protocol to apply its field labels, or cancel to skip."
         )
         header.setWordWrap(True)
@@ -172,6 +172,10 @@ class ProtocolMatchDialog(QDialog):
                     f"<b>Leading zeros:</b>"
                     f" {match.leading_zeros_count} bits"
                     f" (will be labeled as noise)"
+                )
+            if match.cipher:
+                lines.append(
+                    f"<b>Cipher:</b> {match.cipher}" f" (available in Crypto Toolkit)"
                 )
 
             lines.append("")

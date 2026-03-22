@@ -8,7 +8,7 @@ URH 3.0 includes an auto-protocol identification engine based on the [rtl_433](h
 ┌──────────────────────────────────────────────────────────┐
 │                    URH Analysis Tab                       │
 │                                                           │
-│  Analyze ▼ → "Auto-identify protocol (rtl_433 DB)"       │
+│  Analyze ▼ → "Auto-identify protocol (PHZ DB)"       │
 │                                                           │
 │  ┌─────────────────────────────────────────────────────┐  │
 │  │  ProtocolMatcher (src/urh/awre/ProtocolMatcher.py)  │  │

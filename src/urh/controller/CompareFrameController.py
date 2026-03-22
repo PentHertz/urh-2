@@ -125,11 +125,15 @@ class CompareFrameController(QWidget):
         self.assign_participant_address_action.setChecked(True)
         self.analyze_menu.addSeparator()
         self.auto_identify_protocol_action = self.analyze_menu.addAction(
-            self.tr("Auto-identify protocol (rtl_433 DB)")
+            self.tr("Auto-identify protocol (PHZ DB)")
         )
         self.auto_identify_protocol_action.triggered.connect(
             self.on_auto_identify_protocol_triggered
         )
+        self.crypto_toolkit_action = self.analyze_menu.addAction(
+            self.tr("Crypto Toolkit (KeeLoq, TEA, AES...)")
+        )
+        self.crypto_toolkit_action.triggered.connect(self.on_keeloq_decoder_triggered)
         self.ui.btnAnalyze.setMenu(self.analyze_menu)
 
         self.ui.lblShownRows.hide()
@@ -1392,8 +1396,49 @@ class CompareFrameController(QWidget):
         self.message_type_table_model.update()  # in case message types were added by logic analyzer
 
     @pyqtSlot()
+    def on_keeloq_decoder_triggered(self):
+        """Open Crypto Toolkit, pre-filled from selected message."""
+        from urh.controller.dialogs.KeeLoqDialog import KeeLoqDialog
+
+        encrypted = 0
+        serial = 0
+        cipher_hint = getattr(self, "_last_cipher_hint", "")
+
+        # Extract encrypted + serial from selected message labels
+        if self.proto_analyzer.messages:
+            msg = None
+            sel = self.ui.tblViewProtocol.selectionModel().selectedRows()
+            if sel:
+                row = sel[0].row()
+                if row < len(self.proto_analyzer.messages):
+                    msg = self.proto_analyzer.messages[row]
+            if msg is None:
+                msg = self.proto_analyzer.messages[0]
+
+            bits = msg.decoded_bits_str or msg.plain_bits_str
+            for label in msg.message_type:
+                name = label.name.lower()
+                start = label.start
+                end = label.end
+                field_bits = bits[start:end]
+                if not field_bits:
+                    continue
+                if "encrypted" in name and len(field_bits) >= 32:
+                    encrypted = int(field_bits[:32][::-1], 2)
+                elif "id" in name and len(field_bits) >= 16:
+                    serial = int(field_bits[::-1], 2)
+
+        dialog = KeeLoqDialog(
+            parent=self,
+            encrypted=encrypted,
+            serial=serial,
+            cipher_hint=cipher_hint,
+        )
+        dialog.exec()
+
+    @pyqtSlot()
     def on_auto_identify_protocol_triggered(self):
-        """Auto-identify protocol by matching messages against the rtl_433 database."""
+        """Auto-identify protocol by matching messages against the PHZ database."""
         from urh.awre.ProtocolMatcher import ProtocolMatcher
 
         messages = self.proto_analyzer.messages
@@ -1425,7 +1470,7 @@ class CompareFrameController(QWidget):
                 self,
                 self.tr("No matches found"),
                 self.tr(
-                    "Could not identify the protocol from the rtl_433 database.\n\n"
+                    "Could not identify the protocol from the PHZ database.\n\n"
                     "The signal may use a protocol not in the database, "
                     "or the message structure may not match known patterns.\n\n"
                     "You can still use the standard 'Analyze protocol' button "
@@ -1448,6 +1493,9 @@ class CompareFrameController(QWidget):
         3. THEN apply the decoder (it will skip preamble/gap, only decode data)
         """
         from urh.awre.ProtocolMatcher import ProtocolMatcher
+
+        # Store cipher hint so Crypto Toolkit auto-selects it
+        self._last_cipher_hint = getattr(match, "cipher", "")
 
         applied_parts = []
 

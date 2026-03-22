@@ -1,10 +1,10 @@
 """
-Automatic protocol identification engine.
+Automatic protocol identification engine (PHZ DB).
 
-Matches demodulated URH messages against known protocol signatures
-extracted from the rtl_433 project database. Can also auto-detect
-the best decoder (Manchester, PWM, differential, etc.) and strip
-leading zeros/noise before the preamble.
+Matches demodulated URH messages against 327 known protocol signatures
+from the PHZ database (rtl_433 sensors + Flipper-ARF automotive).
+Auto-detects the best decoder (Manchester, PWM, differential, Miller, etc.)
+and strips leading zeros/noise before the preamble.
 """
 import array
 import copy
@@ -33,8 +33,10 @@ class ProtocolMatch:
         details: dict,
         recommended_decoder: Optional[Encoding] = None,
         leading_zeros_count: int = 0,
+        cipher: str = "",
     ):
         self.name = protocol_entry.get("name", "Unknown")
+        self.cipher = cipher
         self.entry = protocol_entry
         self.score = score  # 0.0 to 1.0
         self.details = details  # explanation of scoring
@@ -52,7 +54,7 @@ class ProtocolMatch:
 class ProtocolMatcher:
     """
     Matches URH protocol messages against known protocol signatures
-    from the rtl_433 database.
+    from the PHZ database (323 protocols).
 
     Scoring criteria:
     - Message length match (after stripping leading zeros)
@@ -333,12 +335,21 @@ class ProtocolMatcher:
                 if best_decoder is None:
                     best_decoder = self._find_best_decoder(proto, features)
 
+                # Find cipher for this protocol
+                proto_name = proto.get("name", "")
+                cipher = ""
+                for key, cval in self.PROTOCOL_CIPHERS.items():
+                    if key in proto_name:
+                        cipher = cval
+                        break
+
                 match = ProtocolMatch(
                     proto,
                     final_score,
                     details,
                     recommended_decoder=best_decoder,
                     leading_zeros_count=features.get("leading_zeros", 0),
+                    cipher=cipher,
                 )
                 scored.append(match)
 
@@ -740,6 +751,35 @@ class ProtocolMatcher:
 
         return total_errors / total_bits if total_bits > 0 else 1.0
 
+    # ── Protocol-to-cipher mapping ─────────────────────────────
+    # Maps protocol names to their cipher, so the crypto toolkit
+    # auto-selects the right cipher after auto-identification.
+    PROTOCOL_CIPHERS = {
+        "HCS200": "KeeLoq",
+        "HCS300": "KeeLoq",
+        "KeeLoq": "KeeLoq",
+        "FAAC SLH": "KeeLoq",
+        "NICE Flor": "KeeLoq",
+        "StarLine": "KeeLoq",
+        "Subaru car": "KeeLoq",
+        "Ford V0": "Ford-GF2-CRC",
+        "Fiat Marelli": "TEA",
+        "Fiat SPA": "TEA",
+        "PSA Peugeot": "TEA",
+        "VAG VW Audi": "TEA",
+        "KIA V0": "KeeLoq",
+        "KIA V1": "KeeLoq",
+        "KIA V2": "KeeLoq",
+        "KIA V3": "KeeLoq",
+        "KIA V5": "KIA-V5-Mixer",
+        "KIA V6": "AES-128",
+        "Porsche Cayenne": "KeeLoq",
+        "Mitsubishi": "Mitsubishi-XOR",
+        "Somfy": "TEA",
+        "Scher-Khan": "KeeLoq",
+        "Suzuki": "KeeLoq",
+    }
+
     # ── Known protocol bitstream layouts ───────────────────────
     # Maps protocol names (substring match) to their actual bit layout.
     # Each entry: (field_name, bit_count, bit_order, endianness, display_format)
@@ -747,19 +787,119 @@ class ProtocolMatcher:
     #   endianness: "big"/"little"
     #   display_format: 0=Bit, 1=Hex, 2=ASCII, 3=Decimal, 4=BCD
     KNOWN_LAYOUTS = {
+        # Microchip HCS200/300 KeeLoq
         "HCS200": [
-            ("encrypted", 32, 1, "big", 1),  # Hex
-            ("id", 28, 1, "big", 1),  # Hex
-            ("button", 4, 1, "big", 3),  # Decimal
-            ("battery_ok", 1, 0, "big", 0),  # Bit
-            ("repeat", 1, 0, "big", 0),  # Bit
+            ("encrypted", 32, 1, "big", 1),
+            ("id", 28, 1, "big", 1),
+            ("button", 4, 1, "big", 3),
+            ("battery_ok", 1, 0, "big", 0),
+            ("repeat", 1, 0, "big", 0),
         ],
         "HCS300": [
-            ("encrypted", 32, 1, "big", 1),  # Hex
-            ("id", 28, 1, "big", 1),  # Hex
-            ("button", 4, 1, "big", 3),  # Decimal
-            ("battery_ok", 1, 0, "big", 0),  # Bit
-            ("repeat", 1, 0, "big", 0),  # Bit
+            ("encrypted", 32, 1, "big", 1),
+            ("id", 28, 1, "big", 1),
+            ("button", 4, 1, "big", 3),
+            ("battery_ok", 1, 0, "big", 0),
+            ("repeat", 1, 0, "big", 0),
+        ],
+        # KeeLoq generic (same layout as HCS200/300)
+        "KeeLoq": [
+            ("encrypted", 32, 1, "big", 1),
+            ("id", 28, 1, "big", 1),
+            ("button", 4, 1, "big", 3),
+        ],
+        # FAAC SLH (KeeLoq-compatible)
+        "FAAC SLH": [
+            ("encrypted", 32, 1, "big", 1),
+            ("id", 28, 1, "big", 1),
+            ("button", 4, 1, "big", 3),
+        ],
+        # NICE Flor-S
+        "NICE Flor": [
+            ("encrypted", 32, 0, "big", 1),
+            ("id", 16, 0, "big", 1),
+            ("button", 4, 0, "big", 3),
+        ],
+        # CAME 12-bit
+        "CAME gate": [
+            ("id", 8, 0, "big", 1),
+            ("button", 4, 0, "big", 3),
+        ],
+        # Ford V0
+        "Ford V0": [
+            ("id", 32, 0, "big", 1),
+            ("button", 4, 0, "big", 3),
+            ("counter", 16, 0, "big", 3),
+            ("checksum", 12, 0, "big", 1),
+        ],
+        # Fiat Marelli (80 bits after preamble)
+        "Fiat Marelli": [
+            ("id", 32, 0, "big", 1),
+            ("button", 4, 0, "big", 3),
+            ("epoch", 4, 0, "big", 3),
+            ("counter", 8, 0, "big", 3),
+            ("encrypted", 32, 0, "big", 1),
+        ],
+        # KIA V6 (144 bits, AES)
+        "KIA V6": [
+            ("id", 32, 0, "big", 1),
+            ("button", 8, 0, "big", 3),
+            ("counter", 32, 0, "big", 3),
+            ("encrypted", 64, 0, "big", 1),
+            ("checksum", 8, 0, "big", 1),
+        ],
+        # VAG (VW/Audi, 80 bits)
+        "VAG VW Audi": [
+            ("id", 24, 0, "big", 1),
+            ("button", 4, 0, "big", 3),
+            ("counter", 20, 0, "big", 3),
+            ("encrypted", 32, 0, "big", 1),
+        ],
+        # Porsche Cayenne (64 bits)
+        "Porsche Cayenne": [
+            ("id", 20, 0, "big", 1),
+            ("button", 4, 0, "big", 3),
+            ("counter", 16, 0, "big", 3),
+            ("encrypted", 24, 0, "big", 1),
+        ],
+        # Somfy Telis (56 bits)
+        "Somfy Telis": [
+            ("checksum", 4, 0, "big", 1),
+            ("button", 4, 0, "big", 3),
+            ("counter", 16, 0, "big", 3),
+            ("id", 24, 0, "big", 1),
+            ("data", 8, 0, "big", 1),
+        ],
+        # Princeton PT2262 (24 bits)
+        "Princeton": [
+            ("id", 16, 0, "big", 1),
+            ("button", 4, 0, "big", 3),
+            ("data", 4, 0, "big", 1),
+        ],
+        # Scher-Khan MAGIC CODE (51 bits dynamic)
+        "Scher-Khan": [
+            ("counter", 16, 0, "big", 3),
+            ("data", 8, 0, "big", 1),
+            ("button", 4, 0, "big", 3),
+            ("id", 23, 0, "big", 1),
+        ],
+        # StarLine (64 bits, KeeLoq)
+        "StarLine": [
+            ("encrypted", 32, 0, "big", 1),
+            ("id", 28, 0, "big", 1),
+            ("button", 4, 0, "big", 3),
+        ],
+        # KIA V2 (52 bits)
+        "KIA V2": [
+            ("data", 48, 0, "big", 1),
+            ("checksum", 4, 0, "big", 1),
+        ],
+        # KIA V3/V4 (68 bits, KeeLoq)
+        "KIA V3": [
+            ("encrypted", 32, 1, "big", 1),
+            ("id", 28, 1, "big", 1),
+            ("button", 4, 1, "big", 3),
+            ("checksum", 4, 0, "big", 1),
         ],
     }
 
