@@ -1,36 +1,185 @@
 ![URH image](https://raw.githubusercontent.com/jopohl/urh/master/data/icons/banner.png)
 
-[![CI](https://github.com/jopohl/urh/actions/workflows/ci.yml/badge.svg)](https://github.com/jopohl/urh/actions/workflows/ci.yml)
+# URH-NG: Universal Radio Hacker - Next Generation
+
+[![CI](https://github.com/PentHertz/urh-ng/actions/workflows/ci.yml/badge.svg)](https://github.com/PentHertz/urh-ng/actions/workflows/ci.yml)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-black)](https://github.com/psf/black)
-[![PyPI version](https://badge.fury.io/py/urh.svg)](https://badge.fury.io/py/urh)
-[![Packaging status](https://repology.org/badge/tiny-repos/urh.svg)](https://repology.org/project/urh/versions)
- [![Blackhat Arsenal 2017](https://rawgit.com/toolswatch/badges/master/arsenal/usa/2017.svg)](http://www.toolswatch.org/2017/06/the-black-hat-arsenal-usa-2017-phenomenal-line-up-announced/)
- [![Blackhat Arsenal 2018](https://rawgit.com/toolswatch/badges/master/arsenal/europe/2018.svg)](http://www.toolswatch.org/2018/09/black-hat-arsenal-europe-2018-lineup-announced/)
+[![Blackhat Arsenal 2017](https://rawgit.com/toolswatch/badges/master/arsenal/usa/2017.svg)](http://www.toolswatch.org/2017/06/the-black-hat-arsenal-usa-2017-phenomenal-line-up-announced/)
+[![Blackhat Arsenal 2018](https://rawgit.com/toolswatch/badges/master/arsenal/europe/2018.svg)](http://www.toolswatch.org/2018/09/black-hat-arsenal-europe-2018-lineup-announced/)
 
+> **Beta** -- URH-NG is currently in beta and under active testing. It will be available in the [RF Swift](https://rfswift.io) image starting with **v0.1.6**.
 
-The Universal Radio Hacker (URH) is a complete suite for wireless protocol investigation with native support for [many](https://github.com/jopohl/urh/wiki/Supported-devices) common __Software Defined Radios__.
-URH allows __easy demodulation__ of signals combined with an [automatic](https://dl.acm.org/doi/10.1145/3375894.3375896) detection of modulation parameters making it a breeze to identify the bits and bytes that fly over the air. 
-As data often gets _encoded_ before transmission, URH offers __customizable decodings__ to crack even sophisticated encodings like CC1101 data whitening.
-When it comes to __protocol reverse-engineering__, URH is helpful in two ways. You can either manually assign protocol fields and message types or let URH __automatically infer protocol fields__ with a [rule-based intelligence](https://www.usenix.org/conference/woot19/presentation/pohl).
-Finally, URH entails a __fuzzing component__ aimed at stateless protocols and a __simulation environment__ for stateful attacks.
+**URH-NG** is a next-generation fork of [Universal Radio Hacker](https://github.com/jopohl/urh), maintained by [PentHertz](https://penthertz.com). It extends URH with **automatic protocol identification against 327 protocols**, an **automotive RF crypto toolkit with 23 ciphers**, and support for **new SDR hardware** including HydraSDR, Harogic spectrum analyzers, and Signal Hound BB60.
 
-### Getting started
-In order to get started
- - view the [installation instructions](#Installation) on this page,
- - download the [official userguide (PDF)](https://github.com/jopohl/urh/releases/download/v2.0.0/userguide.pdf), 
- - watch the [demonstration videos (YouTube)](https://www.youtube.com/watch?v=kuubkTDAxwA&index=1&list=PLlKjreY6G-1EKKBs9sucMdk8PwzcFuIPB),
- - check out the [wiki](https://github.com/jopohl/urh/wiki) for more information such as supported devices or
- - read some [articles about URH](#Articles) for inspiration.
+URH-NG is a complete suite for wireless protocol investigation with native support for many common Software Defined Radios. It allows easy demodulation of signals combined with [automatic](https://dl.acm.org/doi/10.1145/3375894.3375896) detection of modulation parameters making it a breeze to identify the bits and bytes that fly over the air.
+As data often gets encoded before transmission, URH-NG offers customizable decodings to crack even sophisticated encodings like CC1101 data whitening.
+When it comes to protocol reverse-engineering, URH-NG is helpful in two ways. You can either manually assign protocol fields and message types or let URH-NG **automatically infer protocol fields** with a [rule-based intelligence](https://www.usenix.org/conference/woot19/presentation/pohl).
+Finally, URH-NG entails a fuzzing component aimed at stateless protocols and a simulation environment for stateful attacks.
 
-If you like URH, please :star: this repository and [join our Slack channel](https://join.slack.com/t/stralsundsecurity/shared_invite/enQtMjEwOTIxNzMzODc3LTk3NmE4MGVjYjEyYTMzYTdmN2RlNzUzYzg0NTNjNTQ2ODBkMzI3MDZlOWY3MjE4YjBkNTM4ZjJlNTJlZmJhNDg). We appreciate your support!
+---
 
-### Citing URH
-We encourage researchers working with URH to cite [this](https://www.usenix.org/conference/woot18/presentation/pohl) WOOT'18 paper or directly use the following BibTeX entry.
- 
- <details>
- <summary> <b>URH BibTeX entry for your research paper</b> </summary>
- 
-  ```bibtex
+## What's New in URH-NG
+
+### Auto Protocol Identification (PHZ DB)
+
+A database of **327 protocol signatures** sourced from [rtl_433](https://github.com/merbanan/rtl_433), [Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF), and [ProtoPirate](https://github.com/RocketGod-git/ProtoPirate). URH-NG matches captured signals against all 327 protocols using a modulation-aware scoring engine that detects encoding type (PWM, Manchester, NRZ, Miller), preamble patterns (6 types), gap structures (4 types), and field layouts (17 types).
+
+See [SUPPORTED_PROTOCOLS.md](SUPPORTED_PROTOCOLS.md) for the full list.
+
+### Automotive RF Crypto Toolkit (23 Ciphers)
+
+**15 protocols auto-decode** without any user input -- just capture, demodulate, and identify:
+
+| Protocol | Algorithm |
+|----------|-----------|
+| Ford V0 | XOR + bit interleave + GF(2) CRC |
+| KIA V3/V4 | KeeLoq (known master key) |
+| KIA V5 | 18-round mixer cipher |
+| KIA V6 | AES-128 ECB |
+| VAG (VW/Audi/Skoda/Seat) | AUT64 (3 key sets) + TEA |
+| Somfy Telis/Keytis | Cascading XOR |
+| Came Atomo | LFSR bit-flip cipher |
+| Came Twee | 32-bit XOR rainbow table |
+| Mazda Siemens | Parity-XOR + deinterleave |
+| Phoenix V2 | 16-iter bit-shuffle |
+| Security+ v1/v2 | Base-3 ternary encoding |
+| Porsche Cayenne | 24-bit rotating register |
+| Subaru | 24-bit serial rotation + XOR |
+| Mitsubishi V0 | Counter-derived XOR |
+| PSA (Peugeot/Citroen) | TEA mode 0x23 XOR |
+
+**8 guided-decode protocols** with built-in key management and brute-force:
+
+| Protocol | What You Provide |
+|----------|-----------------|
+| KeeLoq (HCS200/300, NICE, StarLine, etc.) | 64-bit manufacturer key (26 built-in keys, brute-force with 2 captures) |
+| FAAC SLH | Manufacturer key + seed |
+| Nice Flor-S | 32-byte rainbow table |
+| Alutech AT-4N | Rainbow table (modified TEA) |
+| Scher-Khan Magicar | Auto-detects PRO1 vs PRO2 |
+| TEA (generic) | 128-bit key |
+| AES-128 (generic) | 128-bit key |
+| AUT64 (generic) | Key nibbles + S-box + P-box |
+
+See [CRYPTO_TOOLKIT.md](CRYPTO_TOOLKIT.md) for full details.
+
+### New SDR Hardware Support
+
+| Device | Type | Notes |
+|--------|------|-------|
+| **HydraSDR** | IQ stream SDR | Multi-device support, sample rate combobox |
+| **Harogic** | HTRA spectrum analyzer | Multi-device support via HTRA SDK |
+| **Signal Hound BB60** | Spectrum analyzer | Native integration via Signal Hound SDK |
+
+### Enhanced Signal Processing
+
+- **PWM encoding support** -- proper short/long pulse width demodulation
+- **Miller encoding support** -- mid-bit transition detection (RFID ISO 14443, EPC Gen2)
+- **FrameAnalyzer** -- detects 6 preamble types, 4 gap types, 3 encoding types automatically
+- **Modulation-aware scoring** -- protocol matching considers PWM vs NRZ vs Manchester
+- **Field coverage scoring** -- penalizes unlabeled trailing data for better protocol fits
+
+### Additional Improvements
+
+- Sample rate combobox for fixed-rate devices
+- Multi-device support for HydraSDR and Harogic
+- Flipper Zero SubGHz plugin
+- CI/CD workflows for multi-arch builds (`.deb` packages)
+- Contributing guide for adding protocols, crypto, and decoders ([CONTRIBUTING_DECODERS.md](CONTRIBUTING_DECODERS.md))
+
+---
+
+## Getting Started
+
+- View the [installation instructions](#installation) below
+- Download the [original userguide (PDF)](https://github.com/jopohl/urh/releases/download/v2.0.0/userguide.pdf) (URH basics still apply)
+- Watch the [demonstration videos (YouTube)](https://www.youtube.com/watch?v=kuubkTDAxwA&index=1&list=PLlKjreY6G-1EKKBs9sucMdk8PwzcFuIPB)
+- Check out the [wiki](https://github.com/jopohl/urh/wiki) for device info and SDR setup
+
+### Quick Start: Auto Protocol Identification
+
+1. **Capture or load** a signal in URH-NG
+2. **Demodulate** the signal (auto-interpretation handles most parameters)
+3. **Analyze -> Auto-identify protocol (PHZ DB)** -- matches against 327 protocols
+4. If a crypto cipher is mapped, the result dialog shows **decoded fields** (SN, button, counter)
+5. For user-key ciphers: **Analyze -> Crypto Toolkit** opens pre-filled with guidance
+
+## Installation
+
+URH-NG runs on Windows, Linux, and macOS. Python 3.9+ is required.
+
+### Linux (recommended)
+
+#### From source
+```bash
+git clone https://github.com/PentHertz/urh-ng.git
+cd urh-ng
+pip install -e .
+```
+
+#### Using `.deb` package
+Pre-built `.deb` packages are available from [GitHub Releases](https://github.com/PentHertz/urh-ng/releases).
+
+In order to access your SDR as non-root user, install the according udev rules. You can find them [in the wiki](https://github.com/jopohl/urh/wiki/SDR-udev-rules).
+
+### Windows
+
+```bash
+pip install urh-ng
+```
+
+If you get an error about missing `api-ms-win-crt-runtime-l1-1-0.dll`, run Windows Update or install [KB2999226](https://support.microsoft.com/en-us/help/2999226/update-for-universal-c-runtime-in-windows).
+
+### macOS
+
+```bash
+pip install urh-ng
+```
+
+### Running from source (all platforms)
+```bash
+git clone https://github.com/PentHertz/urh-ng.git
+cd urh-ng/src/urh
+PYTHONPATH=.. ./main.py
+```
+
+Note: C++ extensions will be built before first usage.
+
+### Docker
+
+```bash
+docker pull penthertz/urh-ng
+```
+
+## Native SDR Backends
+
+Install the `-dev` package for your SDR **before** installing URH-NG for native support:
+
+| SDR | Library | Package |
+|-----|---------|---------|
+| RTL-SDR | librtlsdr | `librtlsdr-dev` |
+| HackRF | libhackrf | `hackrf-dev` |
+| BladeRF | libbladerf | `libbladerf-dev` |
+| LimeSDR | limesuite | `limesuite-dev` |
+| PlutoSDR | libiio | `libiio-dev` |
+| USRP | uhd | `libuhd-dev` |
+| AirSpy | libairspy | `airspy-dev` |
+| SDRPlay | sdrplay | SDRPlay API |
+| HydraSDR | hydrasdr | [hydrasdr-host](https://github.com/hydrasdr/hydrasdr-host) |
+| Harogic | HTRA SDK | Vendor SDK |
+| Signal Hound BB60 | Signal Hound SDK | Vendor SDK |
+| GNU Radio | gnuradio | `gnuradio-dev` |
+
+---
+
+## Citing URH
+
+We encourage researchers working with URH to cite the [WOOT'18 paper](https://www.usenix.org/conference/woot18/presentation/pohl):
+
+<details>
+<summary><b>BibTeX entry</b></summary>
+
+```bibtex
 @inproceedings {220562,
 author = {Johannes Pohl and Andreas Noack},
 title = {Universal Radio Hacker: A Suite for Analyzing and Attacking Stateful Wireless Protocols},
@@ -42,71 +191,18 @@ publisher = {{USENIX} Association},
 }
 ```
 
- </details> 
+</details>
 
-## Installation
-URH runs on Windows, Linux and macOS. See below for OS specific installation instructions.
+## Credits
 
-### Windows
- On Windows, URH can be installed with its [Installer](https://github.com/jopohl/urh/releases). No further dependencies are required.
- 
-If you get an error about missing ```api-ms-win-crt-runtime-l1-1-0.dll```, run Windows Update or directly install [KB2999226](https://support.microsoft.com/en-us/help/2999226/update-for-universal-c-runtime-in-windows).
+URH was originally created by **Johannes Pohl** ([@jopohl](https://github.com/jopohl)).
 
-### Linux
-#### Installation with pipx
-URH is available on [PyPi](https://pypi.org/project/urh/) so you can install it, for example, with [pipx](https://pypa.github.io/pipx/): 
-```bash 
-pipx install urh
-``` 
-This is the recommended way to install URH on Linux because it comes with __all native extensions__ precompiled.
+URH-NG is maintained by **Sebastien Dudek** at [PentHertz](https://penthertz.com) ([@FlUxIuS](https://github.com/FlUxIuS)).
 
-In order to access your SDR as non-root user, install the according __udev rules__. You can find them [in the wiki](https://github.com/jopohl/urh/wiki/SDR-udev-rules).
-
-#### Install via Package Manager
-URH is included in the repositories of many linux distributions such as __Arch Linux__, __Gentoo__, __Fedora__, __openSUSE__ or __NixOS__. There is also a package for __FreeBSD__.  If available, simply use your package manager to install URH.
-
-__Note__: For native support, you must install the according ```-dev``` package(s) of your SDR(s) such as ```hackrf-dev``` __before__ installing URH.
-
-#### Docker Images
-The official URH docker image is available [here](https://hub.docker.com/r/jopohl/urh/). It has all native backends included and ready to operate.
-
-### macOS
-#### Using DMG
-
-It is recommended to use __at least macOS 13__ when using the DMG available [here](https://github.com/jopohl/urh/releases).
-
-#### With brew
-URH is available as a [homebrew formula](https://formulae.brew.sh/formula/urh) so you can install it with
-```commandline
-brew install urh
-```
-
-### Running from source (OS-agnostic)
-#### Without installation
-
-To execute the Universal Radio Hacker without installation, just run:
-```commandline
-git clone https://github.com/jopohl/urh/
-cd urh/src/urh
-PYTHONPATH=.. ./main.py
-```
-
-Note, before first usage the C++ extensions will be built.
-
-#### Installing from source
-
-To install URH from source you need to have ```python-setuptools``` installed. You can get them with ```python3 -m pip install setuptools```. 
-Once the setuptools are installed execute: 
-```commandline
-git clone https://github.com/jopohl/urh/
-cd urh
-python setup.py install
-```
-
-And start the application by typing ```urh``` in a terminal.
-
+See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the full list of contributions.
 
 ## Articles
+
 ### Hacking stuff with URH
 * [Hacking Burger Pagers](https://www.rtl-sdr.com/using-a-hackrf-to-reverse-engineer-and-control-restaurant-pagers/)
 * [Reverse-engineer and Clone a Remote Control](https://www.rtl-sdr.com/video-tutorial-using-universal-radio-hacker-an-rtl-sdr-and-a-microcontroller-to-clone-433-mhz-remotes/)
@@ -123,15 +219,20 @@ And start the application by typing ```urh``` in a terminal.
 * [Brute-forcing a RF Device: a Step-by-step Guide](https://pandwarf.com/news/brute-forcing-a-new-device-a-step-by-step-guide/)
 * [Hacking wireless sockets like a NOOB](https://olof-astrand.medium.com/hacking-wireless-sockets-like-a-noob-b57d4b4812d5)
 
-## External decodings
-See [wiki](https://github.com/jopohl/urh/wiki/External-decodings) for a list of external decodings provided by our community! Thanks for that!
+## External Decodings
+See [wiki](https://github.com/jopohl/urh/wiki/External-decodings) for community-provided decodings.
 
 ## Screenshots
+
 ### Get the data out of raw signals
 ![Interpretation phase](http://i.imgur.com/Wy17Zv3.png)
 
 ### Keep an overview even on complex protocols
- ![Analysis phase](http://i.imgur.com/ubAL3pE.png)
+![Analysis phase](http://i.imgur.com/ubAL3pE.png)
 
 ### Record and send signals
- ![Record](http://i.imgur.com/BfQpg23.png)
+![Record](http://i.imgur.com/BfQpg23.png)
+
+## License
+
+GNU General Public License (GPL)
