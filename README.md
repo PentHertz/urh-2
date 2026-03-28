@@ -145,11 +145,6 @@ PYTHONPATH=.. ./main.py
 
 Note: C++ extensions will be built before first usage.
 
-### Docker
-
-```bash
-docker pull penthertz/urh-ng
-```
 
 ## Native SDR Backends
 
